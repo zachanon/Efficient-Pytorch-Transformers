@@ -9,6 +9,7 @@ params: alpha, beta, b
 
 '''
 
+
 def quantize_network(network, quantization_set='int8', epochs=1):
     """
     Inputs:
@@ -22,7 +23,8 @@ def quantize_network(network, quantization_set='int8', epochs=1):
     """
     
     training_network = copy.deepcopy(network)
-    training_network = initialize_quantized_training_network(training_network, quantization_set)
+    training_network = initialize_quantized_training_network(training_network,
+                                                             quantization_set)
     
     trained_network = train_soft_quantized_network(training_network, epochs)
     
@@ -37,11 +39,10 @@ def initialize_quantized_training_network(training_network, quantization_set):
         
         #infer {s_i[m], o[m]}
         
-        scale = infer_scale(quantization_set)
-        offset = infer_offset(scale)
+        infer_scale_and_offset(module, quantization_set)
         
         #initialize {alpha[m], beta[m], b_i[m]}
-        init
+        initialize_trainable_parameters(module,)
         
         #soft quantization function {Q_X[m], Q_Theta[m]}
             # based on {Y_X[m],Y_Theta[m], X[m], Theta[m]}
@@ -75,24 +76,45 @@ def quantize_trained_network(trained_network):
         
     return quantized_network
 
-def infer_scale(quantization_set):
+def infer_scale_and_offset(module, quantization_set):
     """
+    Infers scaling and offset for the given set. Assigns as buffers to module.
+    
     Inputs:
+        - module: the nn.Module to assign scale to
         - quantization_set: the set of integers to quantize into
-        
-    Returns:
-        - scale: scale of the quantized step function
     """
     
-    return scale
+    assert quantization_set in QUANTIZATION_SETS, \
+        '%s is not an implemented quantization set' % quantization_set
+    
+    values = QUANTIZATIZATION_SETS[quantization_set]
+    scale = torch.zeros(len(values))
+    offset = 0
+    
+    for i in range(values):
+        scale[i] = values[i+1] - values[i]
+        offset += scale[i]
+    
+    module.register_buffer('scale', scale)
+    module.register_buffer('offset', offset/2)
 
-def infer_offset(scale):
-    """
-    Inputs:
-        - scale: a vector of scaling factors for each quantized step function
-        
-    Returns:
-        - offset: global offset to keep quantized output zero-centered
-    """
+def initialize_trainable_parameters(module, quantization_set):
+    '''
+    Initializes the trainable parameters alpha, beta and b for the passed module
     
-    return offset
+    Input:
+        - module: A nn.Module to assign scaling parameters
+    '''
+    
+    #alpha = 1/beta
+    #beta = 5*(max abs of qset) / 4*(max abs of activations X and params Theta)
+    
+    
+QUANTIZATION_SETS = {
+    "int8": sum([[(127-val) for val in range(127)],
+           [(-val) for val in range(1,129)]],
+           []),
+    "binary": [0, 1],
+    "ternary": [-1, 0, 1],
+}
