@@ -9,20 +9,21 @@ PRECISION_TYPES = {
 
 
 def uniform_quantization(parameters, clip_value, bit_precision='int8'):
-"""
-Input:
-    - parameters: torch.Tensor parameters to quantize
-    - clip_value: truncates parameters to [-clip_value, clip_value]
-    - bit_precision: the final quantized bit precision
-    
-Returns:
-    - quantized_parameters: a torch.Tensor that has been uniformly quantized to the given precision
+    """
+    Input:
+        - parameters: torch.Tensor parameters to quantize
+        - clip_value: truncates parameters to [-clip_value, clip_value]
+        - bit_precision: the final quantized bit precision
 
-"""
+    Returns:
+        - quantized_parameters: a torch.Tensor that has been uniformly quantized to the given precision
+        - scale: scaling factor used for further computation
+
+    """
 
     assert bit_precision in PRECISION_TYPES, "%s is not a valid bit precision" % bit_precision
     
-    precision = PRECISION_TYPES[bit_precison]
+    precision = PRECISION_TYPES[bit_precision]
     
     scale = clip_value / (2**(precision-1)-1)
     
@@ -30,15 +31,20 @@ Returns:
     parameters /= scale
     parameters = _cast_precision(parameters, bit_precision)
     
-    return parameters
+    return parameters, scale
 
-def _cast_precison(parameters, bit_precision):
-"""
-Helper method to recast parameter tensor
-"""
-    switch(bit_precision) {
-        case 'int8': return parameters.int8
-        case 'int16': return parameters.int16
-        case 'int32': return parameters.int32
-    }
+
+def _cast_precision(parameters, bit_precision):
+    """
+    Helper method to recast parameter tensor
+    """
+    
+    if bit_precision == 'int8':
+        return parameters.type(torch.int8)
+    
+    if bit_precision == 'int16':
+        return parameters.type(torch.int16)
+    
+    if bit_precision == 'int32':
+        return parameters.type(torch.int32)
 
